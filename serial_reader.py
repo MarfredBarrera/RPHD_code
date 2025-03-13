@@ -321,6 +321,8 @@ if __name__ == '__main__':
     """ Test functionality """
     from optparse import OptionParser
     import time
+    import keyboard
+    
     parser = OptionParser()
     parser.add_option('--mode', action='store', default='run', type='string',
                       dest='mode', help='either "test" or "run"')
@@ -335,22 +337,37 @@ if __name__ == '__main__':
     else:
         daq = Sensor('COM1', mode='ascii')  # for linux probably /dev/ttyUSB0, use dmesg | grep tty to find the port
         start_time = time.time()
-        while True:
-            try:
-                _msg = daq.read()
-                forces = daq.counts_2_force_torque(_msg)
 
-                print(f"Fx: {'%.3f' % (forces[0])} N, Fy: {'%.3f' % (forces[1])} N, Fz: {'%.3f' % (forces[2])} N, "
-                      f"Tx: {'%.3f' % (forces[3])} Nm, Ty: {'%.3f' % (forces[4])} Nm, Tz: {'%.3f' % (forces[5])} Nm")
-                
+        frequency = 30 # Hz
 
-				# Bias Sensor
-                if time.time() - start_time <= 5:
-                    forces = daq.counts_2_force_torque(_msg, unbiased=True)
-                    daq.sensor_bias(forces)
-                    print(f'Biased: {daq._bias}')
+        try:
+            while True:
+                try:
+                    _msg = daq.read()
+                    forces = daq.counts_2_force_torque(_msg)
 
-                # Restrict frequency (30 Hz)
-                # time.sleep(1.0 / frequency - ((time.time() - start_time) % 1.0 / frequency))
-            except Exception as e:
-                print(e)
+                    print(f"Fx: {'%.3f' % (forces[0])} N, Fy: {'%.3f' % (forces[1])} N, Fz: {'%.3f' % (forces[2])} N, "
+                        f"Tx: {'%.3f' % (forces[3])} Nm, Ty: {'%.3f' % (forces[4])} Nm, Tz: {'%.3f' % (forces[5])} Nm")
+                    
+
+                    # Bias Sensor
+                    if time.time() - start_time <= 5:
+                        forces = daq.counts_2_force_torque(_msg, unbiased=True)
+                        daq.sensor_bias(forces)
+                        print(f'Biased: {daq._bias}')
+
+                    # Check for 'b' key press to bias sensor
+                    if keyboard.is_pressed('b'):
+                        forces = daq.counts_2_force_torque(_msg, unbiased=True)
+                        daq.sensor_bias(forces)
+                        time.sleep(0.1)
+
+                    # Restrict frequency (30 Hz)
+                    time.sleep(1.0 / frequency - ((time.time() - start_time) % 1.0 / frequency))
+                except Exception as e:
+                    print(e)
+        except KeyboardInterrupt:
+            daq.stop()
+            daq.connection.close()
+            print('Connection closed...')
+            exit(0)
