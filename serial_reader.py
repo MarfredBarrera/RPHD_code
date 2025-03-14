@@ -63,13 +63,13 @@ class Sensor(object):
             # read message in bytes
             read = self.connection.read(19)
             # Check if sensor has started
-            while len(read) < 1 or read[0] != 0 or len(read) < 11 or read[-1] != 83:
-                while not self.start():
-                    print('[ATI FT SENSOR]: Fixing Sequence')
-                read = self.connection.read(19)
+            # while len(read) < 1 or read[0] != 0 or len(read) < 11 or read[-1] != 83:
+            #     while not self.start():
+            #         print('[ATI FT SENSOR]: Fixing Sequence')
+            #     read = self.connection.read(19)
 
-            self.last_value = read
-            self.last_access = time.time()
+            # self.last_value = read
+            # self.last_access = time.time()
             return read
         else:
             """
@@ -252,12 +252,14 @@ class Sensor(object):
         counts_torque = 110.97  # for Gamma FT sensor and SI-65-5 Calibration Specifications
         if self._mode == 'binary':
             msg_binary = binary_2_counts(msg_binary)
+            
             fx = msg_binary[0] + msg_binary[1]
             fy = msg_binary[2] + msg_binary[3]
             fz = msg_binary[4] + msg_binary[5]
             tx = msg_binary[6] + msg_binary[7]
             ty = msg_binary[8] + msg_binary[9]
             tz = msg_binary[10] + msg_binary[11]
+
             if unbiased:
                 return [fx / counts_force, fy / counts_force, fz / counts_force, tx / counts_torque, ty / counts_torque, tz / counts_torque]
             return [-(fx / counts_force - self._bias[0]), -(fy / counts_force - self._bias[1]), fz / counts_force - self._bias[2], -(tx / counts_torque - self._bias[3]), -(ty / counts_torque - self._bias[4]), tz / counts_torque - self._bias[5]]
@@ -322,7 +324,7 @@ if __name__ == '__main__':
     from optparse import OptionParser
     import time
     import keyboard
-    
+
     parser = OptionParser()
     parser.add_option('--mode', action='store', default='run', type='string',
                       dest='mode', help='either "test" or "run"')
@@ -335,19 +337,22 @@ if __name__ == '__main__':
         print(f"Fx: {'%.2f' % (forces[0]/40 + forces[1]/40)} N, Fy: {'%.2f' % (forces[2]/40 + forces[3]/40)} N, Fz: {'%.2f' % (forces[4]/40 + forces[5]/40)} N, "
               f"Tx: {'%.2f' % (forces[6]/333.33 + forces[7]/333.33)} Nm, Ty: {'%.2f' % (forces[8]/333.33 + forces[9]/333.33)} Nm, Tz: {'%.2f' % (forces[10]/333.33 + forces[11]/333.33)} Nm")
     else:
-        daq = Sensor('COM1', mode='ascii')  # for linux probably /dev/ttyUSB0, use dmesg | grep tty to find the port
+        daq = Sensor('COM1', mode='binary')  # for linux probably /dev/ttyUSB0, use dmesg | grep tty to find the port
         start_time = time.time()
 
-        frequency = 30 # Hz
+        frequency = 10 # Hz
 
         try:
             while True:
                 try:
                     _msg = daq.read()
-                    forces = daq.counts_2_force_torque(_msg)
 
-                    print(f"Fx: {'%.3f' % (forces[0])} N, Fy: {'%.3f' % (forces[1])} N, Fz: {'%.3f' % (forces[2])} N, "
-                        f"Tx: {'%.3f' % (forces[3])} Nm, Ty: {'%.3f' % (forces[4])} Nm, Tz: {'%.3f' % (forces[5])} Nm")
+                    print(_msg)
+                    # forces = daq.counts_2_force_torque(_msg)
+
+
+                    # print(f"Fx: {'%.3f' % (forces[0])} N, Fy: {'%.3f' % (forces[1])} N, Fz: {'%.3f' % (forces[2])} N, "
+                    #     f"Tx: {'%.3f' % (forces[3])} Nm, Ty: {'%.3f' % (forces[4])} Nm, Tz: {'%.3f' % (forces[5])} Nm")
                     
 
                     # Bias Sensor
@@ -363,7 +368,8 @@ if __name__ == '__main__':
                         time.sleep(0.1)
 
                     # Restrict frequency (30 Hz)
-                    time.sleep(1.0 / frequency - ((time.time() - start_time) % 1.0 / frequency))
+                    # time.sleep(1.0 / frequency - ((time.time() - start_time) % 1.0 / frequency))
+                    time.sleep(1/frequency)
                 except Exception as e:
                     print(e)
         except KeyboardInterrupt:
