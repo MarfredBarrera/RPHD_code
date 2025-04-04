@@ -168,7 +168,7 @@ class Sensor(object):
             msg_reset = self.connection.read(11)
             # print(msg_reset)
             # Sensor sampling Frequency allows optimizing for faster output when using CF.
-            self.connection.write(b'SF\r')
+            self.connection.write(b'SF 1000\r')
             msg_reset = self.connection.read(15)
             # print(msg_reset)
             # self.zero_bias()
@@ -248,7 +248,7 @@ class Sensor(object):
         :param unbiased: flag to return unbiased or biased force torque values
         :return list of forces and torques in format [fx, fy, fz, tx, ty, tz]
         """
-        counts_force = 2.68  # for Gamma FT sensor and SI-65-5 Calibration Specifications
+        counts_force = 2.4227  # for Gamma FT sensor and SI-65-5 Calibration Specifications
         counts_torque = 110.97  # for Gamma FT sensor and SI-65-5 Calibration Specifications
         if self._mode == 'binary':
             msg_binary = binary_2_counts(msg_binary)
@@ -271,6 +271,20 @@ class Sensor(object):
             if unbiased:
                 return [fx, fy, fz, tx, ty, tz]
             return [-(fx - self._bias[0]), -(fy - self._bias[1]), fz - self._bias[2], -(tx - self._bias[3]), -(ty - self._bias[4]), tz - self._bias[5]]
+
+
+def record_data(data, filename="ascii_data.csv"):
+    """
+    Records the collected ASCII data into a CSV file.
+    :param data: List of data to record (e.g., forces and torques).
+    :param filename: Name of the file to save the data.
+    """
+
+    elapsed_time = time.time() - start_time
+
+
+    with open(filename, "a") as file:
+        file.write(f"{elapsed_time:.4f}," + ",".join(map(str, data)) + "\n")
 
 
 # Format to accommodate for extra bytes in message and exception
@@ -338,7 +352,7 @@ if __name__ == '__main__':
         daq = Sensor('COM1', mode='ascii')  # for linux probably /dev/ttyUSB0, use dmesg | grep tty to find the port
         start_time = time.time()
 
-        frequency = 30 # Hz
+        frequency = 100 # Hz
 
         try:
             while True:
@@ -346,10 +360,15 @@ if __name__ == '__main__':
                     _msg = daq.read()
                     forces = daq.counts_2_force_torque(_msg)
 
-                    print(f"Fx: {'%.3f' % (forces[0])} N, Fy: {'%.3f' % (forces[1])} N, Fz: {'%.3f' % (forces[2])} N, "
-                        f"Tx: {'%.3f' % (forces[3])} Nm, Ty: {'%.3f' % (forces[4])} Nm, Tz: {'%.3f' % (forces[5])} Nm")
-                    
+                    # store forces and torques
 
+                    # print(f"Fx: {'%.3f' % (forces[0])} N, Fy: {'%.3f' % (forces[1])} N, Fz: {'%.3f' % (forces[2])} N, "
+                    #     f"Tx: {'%.3f' % (forces[3])} Nm, Ty: {'%.3f' % (forces[4])} Nm, Tz: {'%.3f' % (forces[5])} Nm")
+                    
+                    # Record the data
+                    record_data(forces)
+
+                    
                     # Bias Sensor
                     if time.time() - start_time <= 5:
                         forces = daq.counts_2_force_torque(_msg, unbiased=True)
@@ -363,7 +382,8 @@ if __name__ == '__main__':
                         time.sleep(0.1)
 
                     # Restrict frequency (30 Hz)
-                    time.sleep(1.0 / frequency - ((time.time() - start_time) % 1.0 / frequency))
+                    # time.sleep(1.0 / frequency - ((time.time() - start_time) % 1.0 / frequency))
+                    # time.sleep(1.0/frequency)
                 except Exception as e:
                     print(e)
         except KeyboardInterrupt:

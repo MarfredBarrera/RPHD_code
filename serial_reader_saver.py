@@ -9,7 +9,6 @@ Simply read ascii or binary and translate to force (N) and torque (Nm).
 """
 import serial
 import time
-import datetime
 from datetime import datetime  # Correct import for datetime
 import os
 
@@ -321,7 +320,6 @@ def binary_2_counts(binary_msg):
 # SAVING DATA ---------------------------------------------------------------------------------------------------
 
 # Record the start time when the program starts
-start_time = time.time()
 
 def record_data(data, filename="ascii_data.csv"):
     # Calculate the elapsed time in seconds
@@ -337,6 +335,9 @@ if __name__ == '__main__':
     from optparse import OptionParser
     import time
     import keyboard
+
+    start_time = time.time()
+
 
     parser = OptionParser()
     parser.add_option('--mode', action='store', default='run', type='string',
