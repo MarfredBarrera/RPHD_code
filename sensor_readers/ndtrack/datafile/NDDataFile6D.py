@@ -4,6 +4,7 @@
 
 # import ndtrack
 from ndtrack.datafile.NDDataFile import *
+from datetime import datetime
 
 
 class NDDataFile6D(NDDataFile):
@@ -21,7 +22,7 @@ class NDDataFile6D(NDDataFile):
             for i in range(1, num_items + 1):
                 self._header += f",q0_{i},qx_{i},qy_{i},qz_{i},X_{i},Y_{i},Z_{i},err_{i}"
         else:
-            self._header = f"Frame,q0,qx,qy,qz,X,Y,Z,err"
+            self._header = f"Timestamp,Frame,q0,qx,qy,qz,X,Y,Z,err"
 
         return super().initialize(num_items)
 
@@ -32,6 +33,9 @@ class NDDataFile6D(NDDataFile):
             Parameters:
             data    list of NDPose
         """
+        current_time = datetime.now().strftime("%H:%M:%S.%f")
+        self._file.write(f"{current_time},")
+
         if self._frame_number is None:
             self._file.write(str(self._cur_frame))
         else:
