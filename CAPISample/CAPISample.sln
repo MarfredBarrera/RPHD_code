@@ -1,0 +1,23 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.8.34322.80
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "ndcapipy", "ndcapipy\ndcapipy.pyproj", "{C0B212EF-A119-4127-A9E9-9E43BD77C1B1}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{C0B212EF-A119-4127-A9E9-9E43BD77C1B1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C0B212EF-A119-4127-A9E9-9E43BD77C1B1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {6920321F-DAA1-4963-BF35-E3449D469A5C}
+	EndGlobalSection
+EndGlobal
