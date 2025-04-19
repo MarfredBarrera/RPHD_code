@@ -10,6 +10,9 @@ Simply read ascii or binary and translate to force (N) and torque (Nm).
 import serial
 import time
 import os
+from optparse import OptionParser
+import keyboard
+from datetime import datetime
 
 
 class Sensor(object):
@@ -272,19 +275,44 @@ class Sensor(object):
                 return [fx, fy, fz, tx, ty, tz]
             return [-(fx - self._bias[0]), -(fy - self._bias[1]), fz - self._bias[2], -(tx - self._bias[3]), -(ty - self._bias[4]), tz - self._bias[5]]
 
-
+file_initialized = False
 def record_data(data, filename="ascii_data.csv"):
     """
     Records the collected ASCII data into a CSV file.
     :param data: List of data to record (e.g., forces and torques).
     :param filename: Name of the file to save the data.
+    :param overwrite: Whether to overwrite the file if it already exists.
     """
+    global file_initialized
 
+    # Check if the file exists and overwrite it if this is the first write
+    if not file_initialized:
+        if os.path.exists(filename):
+            os.remove(filename)  # Delete the existing file
+        with open(filename, "w") as file:
+            file.write("Time, Fx, Fy, Fz, Tx, Ty, Tz\n")  # Write header
+        file_initialized = True
+
+    # Append data to the file
     elapsed_time = time.time() - start_time
 
-
+    current_time = datetime.now().strftime("%H:%M:%S.%f")
     with open(filename, "a") as file:
-        file.write(f"{elapsed_time:.4f}," + ",".join(map(str, data)) + "\n")
+        file.write(f"{current_time}," + ",".join(map(str, data)) + "\n")
+
+def check_device_on_port(port):
+    """
+    Check if a device exists on the specified COM port.
+    :param port: COM port to check (e.g., 'COM1')
+    :return: True if a device exists, False otherwise
+    """
+    try:
+        with serial.Serial(port, timeout=1) as ser:
+            print(f"[CHECK]: Device found on {port}.")
+            return True
+    except serial.SerialException:
+        print(f"[CHECK]: No device found on {port}.")
+        return False
 
 
 # Format to accommodate for extra bytes in message and exception
@@ -343,6 +371,11 @@ if __name__ == '__main__':
 
     (options, args) = parser.parse_args()
 
+    # Check if a device exists on COM1
+    if not check_device_on_port('COM1'):
+        print("No device detected on COM1. Exiting...")
+        exit(1)    
+
     if options.mode == 'test':
         a = b'\x00\xff\x9c\xff\x98\xff\x13\xff\xe7\x00\x1f\xff\xdd\x06\r\n>QS'
         forces = binary_2_counts(a)
@@ -380,6 +413,13 @@ if __name__ == '__main__':
                         forces = daq.counts_2_force_torque(_msg, unbiased=True)
                         daq.sensor_bias(forces)
                         time.sleep(0.1)
+
+                    # Quit program on 'q' key press
+                    if keyboard.is_pressed('q'):
+                        daq.stop()
+                        daq.connection.close()
+                        print('Connection closed...')
+                        exit(0)
 
                     # Restrict frequency (30 Hz)
                     # time.sleep(1.0 / frequency - ((time.time() - start_time) % 1.0 / frequency))

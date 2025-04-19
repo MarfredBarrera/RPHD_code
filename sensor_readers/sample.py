@@ -2,6 +2,7 @@
 # sample application for tracking data from an Aurora or Polaris system
 
 import argparse
+import time
 from time import sleep
 from ndtrack.ndtracker.NDCAPITracker import NDCAPITracker
 from ndtrack.ndtracker.NDAurora import NDAurora
@@ -9,6 +10,7 @@ from ndtrack.ndtracker.NDPolaris import NDPolaris
 from ndtrack.ndtracker.NDVega import NDVega
 from ndtrack.ndtracker.NDSpectra import NDSpectra
 import logging
+import keyboard
 
 
 class DataHandler:
@@ -143,11 +145,13 @@ def main():
         ndiDevice.start_tracking()
         sleep(float(0.25))
 
-
         # record data for the specified length of time (-t)
         # insert your own file path
         ndiDevice.start_recording(r".\recording\NDI_test")
+
         sleep(float(args.time))
+
+        
         ndiDevice.stop_recording()
 
         ndiDevice.stop_tracking()
@@ -159,7 +163,7 @@ def main():
 
     except KeyboardInterrupt:
         # Ctrl+C interrupt to stop program
-        print("\nCtrl+C detected. Exiting program...")
+        print("\nExit key detected. Exiting program...")
         ndiDevice.stop_recording()
         ndiDevice.stop_tracking()
         ndiDevice.disconnect()
