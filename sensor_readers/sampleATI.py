@@ -498,8 +498,9 @@ if __name__ == '__main__':
 
                     # Check for 'b' key press to bias sensor
                     if keyboard.is_pressed('b'):
-                        forces = daq.counts_2_force_torque(_msg, unbiased=True)
+                        forces = decode_force_torque(_msg)
                         daq.sensor_bias(forces)
+                        print(f'Biased: {daq._bias}')
                         time.sleep(0.1)
 
                     # Quit program on 'q' key press
