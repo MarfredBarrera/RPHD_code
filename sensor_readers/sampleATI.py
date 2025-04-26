@@ -311,7 +311,7 @@ class Sensor(object):
             return [-(fx - self._bias[0]), -(fy - self._bias[1]), fz - self._bias[2], -(tx - self._bias[3]), -(ty - self._bias[4]), tz - self._bias[5]]
 
 # file_initialized = False
-def record_data(data, filename="ascii_data.csv"):
+def record_data(sensor, data, filename="ascii_data.csv"):
     """
     Records the collected ASCII data into a CSV file.
     :param data: List of data to record (e.g., forces and torques).
@@ -332,11 +332,15 @@ def record_data(data, filename="ascii_data.csv"):
         for row in data:
             # Convert the row into a comma-separated string
             time_str = str(row[0])  # Timestamp
-            hex_data_str = str(row[1])  # Hexadecimal data
+            if sensor._mode == 'binary':
+                data_str = str(row[1])  # Hexadecimal data
+            else:
+                data_str = ",".join(map(str, row[1]))
+
             bias_str = ",".join(map(str, row[2]))  # Convert bias list to a comma-separated string
 
             # Write the formatted string to the file
-            file.write(f"{time_str},{hex_data_str},{bias_str}\n")
+            file.write(f"{time_str},{data_str},{bias_str}\n")
 
 def check_device_on_port(port):
     """
@@ -423,15 +427,6 @@ def decode_force_torque(binary_msg):
     ty = int.from_bytes(binary_msg[9:11], byteorder='big', signed=True) / counts_to_torque
     tz = int.from_bytes(binary_msg[11:13], byteorder='big', signed=True) / counts_to_torque
 
-    # Apply biases and return the decoded forces and torques
-    # return [
-    #     fx - bias[0],
-    #     fy - bias[1],
-    #     fz - bias[2],
-    #     tx - bias[3],
-    #     ty - bias[4],
-    #     tz - bias[5]
-    # ]
     return [
         fx,
         fy,
@@ -445,70 +440,70 @@ def decode_force_torque(binary_msg):
 if __name__ == '__main__':
     """ Test functionality """
     from optparse import OptionParser
+    import argparse
     import time
     import keyboard
     
-    parser = OptionParser()
-    parser.add_option('--mode', action='store', default='run', type='string',
-                      dest='mode', help='either "test" or "run"')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--mode', choices=['binary', 'ascii'], default='ascii',help='communication mode: binary or ascii')
 
-    (options, args) = parser.parse_args()
+    args = parser.parse_args()
 
     # Check if a device exists on COM1
     if not check_device_on_port('COM1'):
         print("No device detected on COM1. Exiting...")
         exit(1)    
 
-    if options.mode == 'test':
-        a = b'\x00\xff\x9c\xff\x98\xff\x13\xff\xe7\x00\x1f\xff\xdd\x06\r\n>QS'
-        forces = binary_2_counts(a)
-        print(f"Fx: {'%.2f' % (forces[0]/40 + forces[1]/40)} N, Fy: {'%.2f' % (forces[2]/40 + forces[3]/40)} N, Fz: {'%.2f' % (forces[4]/40 + forces[5]/40)} N, "
-              f"Tx: {'%.2f' % (forces[6]/333.33 + forces[7]/333.33)} Nm, Ty: {'%.2f' % (forces[8]/333.33 + forces[9]/333.33)} Nm, Tz: {'%.2f' % (forces[10]/333.33 + forces[11]/333.33)} Nm")
-    else:
-        daq = Sensor('COM1', mode='binary')  # for linux probably /dev/ttyUSB0, use dmesg | grep tty to find the port
-        start_time = time.perf_counter()
-        # initialize array to store data
-        data = []
+    
+    daq = Sensor('COM1', mode=args.mode)  # for linux probably /dev/ttyUSB0, use dmesg | grep tty to find the port
+    start_time = time.perf_counter()
+    # initialize array to store data
+    data = []
 
-        try:
-            while True:
-                try:
-                    _msg = daq.read()
-                    # forces = daq.counts_2_force_torque(_msg)
-                    # print(len(_msg), _msg.hex())
-                    current_time = time.perf_counter()
+    try:
+        while True:
+            try:
+                _msg = daq.read()
+                current_time = time.perf_counter()
+
+                # store forces and torques
+                if daq._mode == 'binary': # if using binary, store f/t data as hex string
                     data.append((current_time, _msg.hex(), daq._bias))
-                    # store forces and torques
-                    
-                    # Bias Sensor
-                    if time.perf_counter() - start_time <= 2:
+                else: # if using ascii, store f/t data as list of floats
+                    data.append((current_time, _msg, daq._bias))
+                
+                # Bias Sensor
+                if time.perf_counter() - start_time <= 2:
+                    if daq._mode =='binary': # if using binary, decode the message to get f/t for biasing
                         forces = decode_force_torque(_msg)
-                        daq.sensor_bias(forces)
-                        # print(f'Biased: {daq._bias}')
+                    else: # if using ascii, calculate f/t from counts
+                        forces = daq.counts_2_force_torque(_msg, unbiased=True)
+                    daq.sensor_bias(forces)
+                    # print(f'Biased: {daq._bias}')
 
-                    # Check for 'b' key press to bias sensor
-                    if keyboard.is_pressed('b'):
+                # Check for 'b' key press to bias sensor
+                if keyboard.is_pressed('b'):
+                    if daq._mode =='binary':
                         forces = decode_force_torque(_msg)
-                        daq.sensor_bias(forces)
-                        # print(f'Biased: {daq._bias}')
-                        time.sleep(0.1)
+                    else: 
+                        forces = daq.counts_2_force_torque(_msg, unbiased=True)
+                    daq.sensor_bias(forces)
+                    # print(f'Biased: {daq._bias}')
+                    time.sleep(0.1)
 
-                    # Quit program on 'q' key press
-                    if keyboard.is_pressed('q'):
-                        daq.stop()
-                        daq.connection.close()
-                        print('Connection closed...')
-                        exit(0)
+                # Quit program on 'q' key press
+                if keyboard.is_pressed('q'):
+                    daq.stop()
+                    daq.connection.close()
+                    print('Connection closed...')
+                    exit(0)
 
-                    # Restrict frequency (30 Hz)
-                    # time.sleep(1.0 / frequency - ((time.time() - start_time) % 1.0 / frequency))
-                    # time.sleep(1.0/frequency)
-                except Exception as e:
-                    print(e)
-        except KeyboardInterrupt:
-            daq.stop()
-            daq.connection.close()
-            print('Connection closed...')
-            # print(data)
-            record_data(data, filename="ATI_data.csv")
-            exit(0)
+            except Exception as e:
+                print(e)
+    except KeyboardInterrupt:
+        daq.stop()
+        daq.connection.close()
+        print('Connection closed...')
+        # print(data)
+        record_data(daq, data, filename="ATI_data.csv")
+        exit(0)
