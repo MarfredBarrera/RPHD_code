@@ -13,6 +13,7 @@ import os
 from optparse import OptionParser
 import keyboard
 from datetime import datetime
+import numpy as np
 
 
 class Sensor(object):
@@ -63,17 +64,51 @@ class Sensor(object):
         :return bytes in format b'\x00\xff\x93\xff\x98\xfei\xff\xbb\x00\x06\xff\xdb\x06\r\n>QS'
         """
         if self._mode == 'binary':
-            # read message in bytes
-            read = self.connection.read(19)
-            # Check if sensor has started
-            while len(read) < 1 or read[0] != 0 or len(read) < 11 or read[-1] != 83:
-                while not self.start():
-                    print('[ATI FT SENSOR]: Fixing Sequence')
-                read = self.connection.read(19)
+            # # read message in bytes
+            # read = self.connection.read(19)
+            # # Check if sensor has started
+            # while len(read) < 1 or read[0] != 0 or len(read) < 11 or read[-1] != 83:
+            #     while not self.start():
+            #         print('[ATI FT SENSOR]: Fixing Sequence')
+            #     read = self.connection.read(19)
 
-            self.last_value = read
-            self.last_access = time.time()
-            return read
+            # # # self.last_value = read
+            # # # self.last_access = time.time()
+            # return read
+
+            buffer = b''
+
+            while True:
+                # Read a chunk of data from the sensor
+                buffer += self.connection.read(65)  # Read a larger chunk to handle multiple messages
+
+                # Process all valid messages in the buffer
+                while len(buffer) >= 14:  # Ensure we have at least one full message and the next start byte
+                    # Check if the first byte is 0x00
+                    if buffer[0] == 0x00:
+                        # Check if the 14th byte (start of the next message) is also 0x00
+                        if buffer[13] == 0x00:
+                            # Extract the valid message
+                            message = buffer[:13]
+
+                            # Remove the processed message from the buffer
+                            buffer = buffer[13:]
+
+                            # Return the valid message
+                            return message
+                        else:
+                            # If the 14th byte is not 0x00, discard the first byte and resynchronize
+                            buffer = buffer[1:]
+                    else:
+                        # If the first byte is not 0x00, discard it and resynchronize
+                        buffer = buffer[1:]
+
+                # If the buffer grows too large without finding a valid message, reset it
+                if len(buffer) > 100:
+                    print("[ATI FT SENSOR]: Buffer overflow, resetting buffer.")
+                    buffer = b''
+
+
         else:
             """
             The read string from the sensor is in format as bytes in ascii form:
@@ -275,7 +310,7 @@ class Sensor(object):
                 return [fx, fy, fz, tx, ty, tz]
             return [-(fx - self._bias[0]), -(fy - self._bias[1]), fz - self._bias[2], -(tx - self._bias[3]), -(ty - self._bias[4]), tz - self._bias[5]]
 
-file_initialized = False
+# file_initialized = False
 def record_data(data, filename="ascii_data.csv"):
     """
     Records the collected ASCII data into a CSV file.
@@ -283,22 +318,25 @@ def record_data(data, filename="ascii_data.csv"):
     :param filename: Name of the file to save the data.
     :param overwrite: Whether to overwrite the file if it already exists.
     """
-    global file_initialized
 
-    # Check if the file exists and overwrite it if this is the first write
-    if not file_initialized:
-        if os.path.exists(filename):
-            os.remove(filename)  # Delete the existing file
-        with open(filename, "w") as file:
-            file.write("Time, Fx, Fy, Fz, Tx, Ty, Tz\n")  # Write header
-        file_initialized = True
+    # Check if the file exists and overwrite it
+    if os.path.exists(filename):
+        os.remove(filename)  # Delete the existing file
+
+    # Write the header
+    with open(filename, "w") as file:
+        file.write("Time,Hex Data,fxBias,fyBias,fxBias,txBias,tyBias,tzBias\n")  # Write header
 
     # Append data to the file
-    elapsed_time = time.time() - start_time
-
-    current_time = datetime.now().strftime("%H:%M:%S.%f")
     with open(filename, "a") as file:
-        file.write(f"{current_time}," + ",".join(map(str, data)) + "\n")
+        for row in data:
+            # Convert the row into a comma-separated string
+            time_str = str(row[0])  # Timestamp
+            hex_data_str = str(row[1])  # Hexadecimal data
+            bias_str = ",".join(map(str, row[2]))  # Convert bias list to a comma-separated string
+
+            # Write the formatted string to the file
+            file.write(f"{time_str},{hex_data_str},{bias_str}\n")
 
 def check_device_on_port(port):
     """
@@ -313,6 +351,8 @@ def check_device_on_port(port):
     except serial.SerialException:
         print(f"[CHECK]: No device found on {port}.")
         return False
+
+
 
 
 # Format to accommodate for extra bytes in message and exception
@@ -358,6 +398,49 @@ def binary_2_counts(binary_msg):
         # print(_binary_msg[0], _binary_msg[1], _binary_msg[2], _binary_msg[3], _binary_msg[4], _binary_msg[5], _binary_msg[6], _binary_msg[7], _binary_msg[8], _binary_msg[9], _binary_msg[10], _binary_msg[11])
         return [binary_msg[1], binary_msg[2], binary_msg[3], binary_msg[4], binary_msg[5], binary_msg[6], binary_msg[7], binary_msg[8], binary_msg[9], binary_msg[10], binary_msg[11], binary_msg[12]]
 
+def decode_force_torque(binary_msg):
+    """
+    Decode binary data into force and torque values.
+    :param binary_msg: Binary message in the format:
+                       <error><Fx high><Fx low><Fy high><Fy low><Fz high><Fz low>
+                       <Tx high><Tx low><Ty high><Ty low><Tz high><Tz low>
+                       in hexadecimal format
+    :return: List of forces and torques in the format [Fx, Fy, Fz, Tx, Ty, Tz]
+    """
+    # Scaling factors (adjust based on your sensor's calibration)
+    counts_to_force = 2.4227  # Example: counts per Newton for force
+    counts_to_torque = 110.97  # Example: counts per Newton-meter for torque
+
+    # Ensure the binary message is at least 13 bytes long
+    if len(binary_msg) < 13:
+        raise ValueError("Binary message is too short to decode.")
+    
+    # Extract high and low bytes for each value and combine them
+    fx = int.from_bytes(binary_msg[1:3], byteorder='big', signed=True) / counts_to_force
+    fy = int.from_bytes(binary_msg[3:5], byteorder='big', signed=True) / counts_to_force
+    fz = int.from_bytes(binary_msg[5:7], byteorder='big', signed=True) / counts_to_force
+    tx = int.from_bytes(binary_msg[7:9], byteorder='big', signed=True) / counts_to_torque
+    ty = int.from_bytes(binary_msg[9:11], byteorder='big', signed=True) / counts_to_torque
+    tz = int.from_bytes(binary_msg[11:13], byteorder='big', signed=True) / counts_to_torque
+
+    # Apply biases and return the decoded forces and torques
+    # return [
+    #     fx - bias[0],
+    #     fy - bias[1],
+    #     fz - bias[2],
+    #     tx - bias[3],
+    #     ty - bias[4],
+    #     tz - bias[5]
+    # ]
+    return [
+        fx,
+        fy,
+        fz,
+        tx,
+        ty,
+        tz
+    ]
+    
 
 if __name__ == '__main__':
     """ Test functionality """
@@ -382,29 +465,34 @@ if __name__ == '__main__':
         print(f"Fx: {'%.2f' % (forces[0]/40 + forces[1]/40)} N, Fy: {'%.2f' % (forces[2]/40 + forces[3]/40)} N, Fz: {'%.2f' % (forces[4]/40 + forces[5]/40)} N, "
               f"Tx: {'%.2f' % (forces[6]/333.33 + forces[7]/333.33)} Nm, Ty: {'%.2f' % (forces[8]/333.33 + forces[9]/333.33)} Nm, Tz: {'%.2f' % (forces[10]/333.33 + forces[11]/333.33)} Nm")
     else:
-        daq = Sensor('COM1', mode='ascii')  # for linux probably /dev/ttyUSB0, use dmesg | grep tty to find the port
-        start_time = time.time()
+        daq = Sensor('COM1', mode='binary')  # for linux probably /dev/ttyUSB0, use dmesg | grep tty to find the port
+        start_time = time.perf_counter()
 
         frequency = 100 # Hz
+
+        # initialize array to store data
+        data = []
 
         try:
             while True:
                 try:
                     _msg = daq.read()
-                    forces = daq.counts_2_force_torque(_msg)
-
+                    # forces = daq.counts_2_force_torque(_msg)
+                    # print(len(_msg), _msg.hex())
+                    current_time = time.perf_counter()
+                    data.append((current_time, _msg.hex(), daq._bias))
                     # store forces and torques
 
                     # print(f"Fx: {'%.3f' % (forces[0])} N, Fy: {'%.3f' % (forces[1])} N, Fz: {'%.3f' % (forces[2])} N, "
                     #     f"Tx: {'%.3f' % (forces[3])} Nm, Ty: {'%.3f' % (forces[4])} Nm, Tz: {'%.3f' % (forces[5])} Nm")
                     
                     # Record the data
-                    record_data(forces)
+                    # record_data(forces)
 
                     
                     # Bias Sensor
-                    if time.time() - start_time <= 5:
-                        forces = daq.counts_2_force_torque(_msg, unbiased=True)
+                    if time.perf_counter() - start_time <= 2:
+                        forces = decode_force_torque(_msg)
                         daq.sensor_bias(forces)
                         print(f'Biased: {daq._bias}')
 
@@ -430,4 +518,6 @@ if __name__ == '__main__':
             daq.stop()
             daq.connection.close()
             print('Connection closed...')
+            # print(data)
+            record_data(data, filename="ATI_data.csv")
             exit(0)

@@ -8,6 +8,10 @@ def get_sec(time_str):
     h, m, s = time_str.split(':')
     return float(h) * 3600 + float(m) * 60 + float(s)
 
+def decode_binary(hex_data):
+    """Decode binardy data from hex string"""
+    return bytes.fromhex(hex_data)
+
 def plot_xyz_positions(file_path):
     # Initialize lists to store data
     timestamps = []
@@ -65,6 +69,3 @@ def plot_xyz_positions(file_path):
 # Filepath to the CSV file
 file_path = r".\recording\NDI_test_n6d.csv"
 plot_xyz_positions(file_path)
-
-
-
