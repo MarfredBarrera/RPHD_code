@@ -467,9 +467,6 @@ if __name__ == '__main__':
     else:
         daq = Sensor('COM1', mode='binary')  # for linux probably /dev/ttyUSB0, use dmesg | grep tty to find the port
         start_time = time.perf_counter()
-
-        frequency = 100 # Hz
-
         # initialize array to store data
         data = []
 
@@ -482,25 +479,18 @@ if __name__ == '__main__':
                     current_time = time.perf_counter()
                     data.append((current_time, _msg.hex(), daq._bias))
                     # store forces and torques
-
-                    # print(f"Fx: {'%.3f' % (forces[0])} N, Fy: {'%.3f' % (forces[1])} N, Fz: {'%.3f' % (forces[2])} N, "
-                    #     f"Tx: {'%.3f' % (forces[3])} Nm, Ty: {'%.3f' % (forces[4])} Nm, Tz: {'%.3f' % (forces[5])} Nm")
-                    
-                    # Record the data
-                    # record_data(forces)
-
                     
                     # Bias Sensor
                     if time.perf_counter() - start_time <= 2:
                         forces = decode_force_torque(_msg)
                         daq.sensor_bias(forces)
-                        print(f'Biased: {daq._bias}')
+                        # print(f'Biased: {daq._bias}')
 
                     # Check for 'b' key press to bias sensor
                     if keyboard.is_pressed('b'):
                         forces = decode_force_torque(_msg)
                         daq.sensor_bias(forces)
-                        print(f'Biased: {daq._bias}')
+                        # print(f'Biased: {daq._bias}')
                         time.sleep(0.1)
 
                     # Quit program on 'q' key press
