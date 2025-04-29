@@ -7,6 +7,7 @@
 import threading
 from datetime import datetime
 from time import sleep
+import time
 
 # import ndtrack
 from ndtrack.ndtracker.NDDataSource import *
@@ -358,8 +359,8 @@ class NDTracker(NDDataSource, ABC):
         if filename == "--default--":
             # there is no filename specified in the configuration, create a filename
             # the default filename is the device name and data and time
-            now = datetime.now()
-            filename = f"recording/{self.name}_{now.strftime('%Y%m%d_%H%M%S')}"
+            now = time.perf_counter()
+            filename = f"recording/{self.name}_{now}"
 
         # the recording data file format is part of the configuration
         # options include "csv" - default. text comma separated data file
