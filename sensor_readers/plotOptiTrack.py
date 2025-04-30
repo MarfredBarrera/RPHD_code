@@ -16,6 +16,12 @@ y = data.iloc[:, 6]
 z = data.iloc[:, 7]
 
 
+time = np.array(time) - time[0]  # Normalize time to start from 0
+time_differences = np.diff(time)  # Calculate differences between consecutive timestamps
+avg_time_difference = np.mean(time_differences)  # Average of the time differences
+achieved_frequency = 1 / avg_time_difference  # Invert the average to get the frequency
+print(f"Achieved Sampling Frequency: {achieved_frequency:.2f} Hz")
+
 # Create a figure and axes for the plots
 fig, axs = plt.subplots(2, 1, figsize=(10, 8))
 

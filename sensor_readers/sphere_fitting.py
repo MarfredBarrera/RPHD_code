@@ -64,7 +64,7 @@ if __name__ == '__main__':
 
     r, x0, y0, z0 = sphereFit(X,Y,Z)
 
-    u, v = np.mgrid[0:2*np.pi:20j, 0:np.pi:10j]
+    u, v = np.mgrid[0:2*np.pi:50j, 0:np.pi:30j]
     x=np.cos(u)*np.sin(v)*r
     y=np.sin(u)*np.sin(v)*r
     z=np.cos(v)*r
@@ -82,16 +82,38 @@ if __name__ == '__main__':
     #   3D plot of Sphere
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    ax.plot_wireframe(x, y, z, color="r", linewidth=0.5, alpha=0.5)
-    ax.scatter(X, Y, Z, zdir='z', s=2, c='b',rasterized=True)
+    ax.plot_wireframe(x, y, z, color="r", linewidth=0.5, alpha=0.2)
+    ax.scatter(X, Y, Z, zdir='z', s=2, c='b',rasterized=True, alpha=1.0)
     ax.set_aspect('equal')
-    # ax.set_xlim3d(-35, 35)
-    # ax.set_ylim3d(-35,35)
-    # ax.set_zlim3d(-70,0)
     ax.set_xlabel('$x$ (mm)',fontsize=16)
     ax.set_ylabel('\n$y$ (mm)',fontsize=16)
     zlabel = ax.set_zlabel('\n$z$ (mm)',fontsize=16)
     plt.show()
-    plt.savefig('SphereFitting.png', format='png', dpi=300, bbox_extra_artists=[zlabel], bbox_inches='tight')
+    # plt.savefig('SphereFitting.png', format='png', dpi=300, bbox_extra_artists=[zlabel], bbox_inches='tight')
+
+    distances = np.linalg.norm(np.array([X, Y, Z]).T - (np.array([x0, y0, z0]).reshape(3,)), axis=1)
+
+    residuals = distances - r
+    rms = np.sqrt(np.mean(residuals**2))  # Root Mean Square Error
+    variance = np.var(residuals, ddof=1)  # ddof=1 for sample variance
+
+    # Plot histogram of residuals
+    plt.figure()
+    plt.hist(residuals, bins=50, color='blue', alpha=0.7, edgecolor='black')
+    # plt.title('Histogram of Residuals', fontsize=16)
+    mean_residual = np.mean(residuals)
+    plt.axvline(mean_residual, color='red', linestyle='--', linewidth=1.5, label=f'Mean: {mean_residual:.2f} mm')
+    plt.xlabel('Residuals (mm)', fontsize=14)
+    plt.ylabel('Frequency', fontsize=14)
+    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.legend()
+    plt.show()
+
+    print("Root Mean Square Error [mm]: ", rms, "\nVariance [mm]: ", variance)
+    # print("Root Mean Square Error [in]: ", rms/25.4, "\nVariance [in]: ", variance/25.4)
+    print("Std Dev [mm]: ", np.std(residuals))
+    print("3 sigma [mm]: ", 3*np.std(residuals))
+
+
 
     

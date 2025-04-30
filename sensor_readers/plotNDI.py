@@ -58,7 +58,7 @@ def plot_xyz_positions(file_path):
     # Add labels and legend
     plt.xlabel('Time [s]')
     plt.ylabel('Position [mm]')
-    plt.title('X, Y, Z Positions Over Time')
+    # plt.title('X, Y, Z Positions Over Time')
     plt.legend()
     # plt.xticks(rotation=45, fontsize=8)  # Rotate x-axis labels for better readability
     plt.tight_layout()
