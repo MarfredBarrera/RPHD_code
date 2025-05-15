@@ -27,17 +27,19 @@ class Sensor(object):
         """
         print('[ATI FT SENSOR]: Connecting via serial...')
         try:
-            # Initialize connection
-            self.connection = serial.Serial(port, timeout=1, baudrate=38400, parity='N', stopbits=1)
-            if os.name == 'nt':
-                pass
-            else:
-                self.connection.open()  # Only for linux
-            print('[ATI FT SENSOR]: Connected.')
             count = 0
             self._bias = [.0, .0, .0, .0, .0, .0]  # Store value to bias forces and torques
             self.reset_time = None
             self._mode = mode.lower()
+            # Initialize connection
+            self.connection = serial.Serial(port, timeout=1, baudrate=38400, parity='N', stopbits=1)
+            # if os.name == 'nt':
+            #     pass
+            # else:
+                # self.connection.open()  # Only for linux
+            
+            print('[ATI FT SENSOR]: Connected.')
+
             # Initialise Sensor
             self.initialise()
             while not self.start():
@@ -442,7 +444,7 @@ if __name__ == '__main__':
     from optparse import OptionParser
     import argparse
     import time
-    import keyboard
+    # import keyboard
     
     parser = argparse.ArgumentParser()
     parser.add_argument('--mode', choices=['binary', 'ascii'], default='ascii',help='communication mode: binary or ascii')
@@ -450,12 +452,12 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Check if a device exists on COM1
-    if not check_device_on_port('COM1'):
+    if not check_device_on_port('/dev/ttyUSB0'):
         print("No device detected on COM1. Exiting...")
         exit(1)    
 
     
-    daq = Sensor('COM1', mode=args.mode)  # for linux probably /dev/ttyUSB0, use dmesg | grep tty to find the port
+    daq = Sensor('/dev/ttyUSB0', mode=args.mode)  # for linux probably /dev/ttyUSB0, use dmesg | grep tty to find the port
     start_time = time.perf_counter()
     # initialize array to store data
     data = []
@@ -481,22 +483,22 @@ if __name__ == '__main__':
                     daq.sensor_bias(forces)
                     # print(f'Biased: {daq._bias}')
 
-                # Check for 'b' key press to bias sensor
-                if keyboard.is_pressed('b'):
-                    if daq._mode =='binary':
-                        forces = decode_force_torque(_msg)
-                    else: 
-                        forces = daq.counts_2_force_torque(_msg, unbiased=True)
-                    daq.sensor_bias(forces)
-                    # print(f'Biased: {daq._bias}')
-                    time.sleep(0.1)
+                # # Check for 'b' key press to bias sensor
+                # if keyboard.is_pressed('b'):
+                #     if daq._mode =='binary':
+                #         forces = decode_force_torque(_msg)
+                #     else: 
+                #         forces = daq.counts_2_force_torque(_msg, unbiased=True)
+                #     daq.sensor_bias(forces)
+                #     # print(f'Biased: {daq._bias}')
+                #     time.sleep(0.1)
 
                 # Quit program on 'q' key press
-                if keyboard.is_pressed('q'):
-                    daq.stop()
-                    daq.connection.close()
-                    print('Connection closed...')
-                    exit(0)
+                # if keyboard.is_pressed('q'):
+                #     daq.stop()
+                #     daq.connection.close()
+                #     print('Connection closed...')
+                #     exit(0)
 
             except Exception as e:
                 print(e)
