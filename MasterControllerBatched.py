@@ -48,11 +48,17 @@ def handle_command(command_line):
     script_path = COMMANDS[command]
 
     if command == "platform":
-        if len(args) != 2:
-            print("Usage: platform <port> <csv_file>")
+        if len(args) not in (2, 3):
+            print("Usage: platform <port> <csv_file> [home|exit]")
             return
-        port, csv_file = args
-        run_script(script_path, [port, "disp", csv_file])
+        port = args[0]
+        csv_file = args[1]
+        extra_arg = args[2] if len(args) == 3 else None
+
+        if extra_arg:
+            run_script(script_path, [port, "disp", csv_file, extra_arg])
+        else:
+            run_script(script_path, [port, "disp", csv_file])
 
     elif command in ("insert", "retract"):
         if len(args) != 1:
@@ -143,7 +149,13 @@ def main():
             if command == "platform" and len(parts) == 1:
                 port = input("Enter the port (e.g., COMX or /dev/ttyUSBX): ").strip()
                 csv_file = input("Enter the path to the CSV file: ").strip()
-                handle_command(f"platform {port} {csv_file}")
+                home_exit = input("Enter 'home' to return home after motion or 'exit' to stop: ").strip().lower()
+                if home_exit not in ("home", "exit"):
+                    home_exit = None
+                if home_exit:
+                    handle_command(f"platform {port} {csv_file} {home_exit}")
+                else:
+                    handle_command(f"platform {port} {csv_file}")
             elif command in ("insert", "retract") and len(parts) == 1:
                 distance = input("Enter displacement: ").strip()
                 handle_command(f"{command} {distance}")
