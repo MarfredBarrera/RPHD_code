@@ -1,6 +1,6 @@
 import serial
 
-SERIAL_PORT = "COM5"  # Adjust as needed for your system
+SERIAL_PORT = "/dev/ttyACM0"  # Adjust as needed for your system
 BAUDRATE = 115200
 
 def send_command(angle, speed):
