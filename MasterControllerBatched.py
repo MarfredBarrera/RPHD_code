@@ -5,8 +5,8 @@ import time
 # Command to script path map
 COMMANDS = {
     "platform": os.path.join("stewart", "stewart_displacement1.py"),
-    "insert": os.path.join("rail", "code.py"),
-    "retract": os.path.join("rail", "code.py"),
+    "insert": os.path.join("rail", "insert-cw.py"),
+    "retract": os.path.join("rail", "retract-ccw.py"),
     "roll": os.path.join("dynamixel", "rolled.py")
 }
 
