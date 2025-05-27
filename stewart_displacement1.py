@@ -28,7 +28,7 @@ def wait_for_stop(stop_flag):
     input("Press Enter to stop motion and hold position...\n")
     stop_flag.append(True)
 
-def run_displacement_motion(ser, csv_file_path):
+def run_displacement_motion(ser, csv_file_path, post_action=None):
     try:
         with open(csv_file_path, 'r', encoding='utf-8-sig') as csvfile:
             reader = list(csv.reader(csvfile))
@@ -92,9 +92,8 @@ def run_displacement_motion(ser, csv_file_path):
 
         print("Motion complete. Platform is holding last position.")
 
-        # Handle post-motion home or exit
-        if len(sys.argv) >= 4:
-            post_action = sys.argv[3].strip().lower()
+        if post_action:
+            post_action = post_action.strip().lower()
             if post_action == 'home':
                 home_platform(ser)
             elif post_action == 'exit':
@@ -128,12 +127,10 @@ def main():
 
     try:
         if mode == "disp":
-            if len(sys.argv) >= 4:
-                csv_file = sys.argv[3]
-            else:
-                csv_file = input("Enter the CSV filename to run displacement motion: ").strip()
+            csv_file = sys.argv[3] if len(sys.argv) >= 4 else input("Enter the CSV filename to run displacement motion: ").strip()
+            post_action = sys.argv[4] if len(sys.argv) >= 5 else None
 
-            run_displacement_motion(ser, csv_file)
+            run_displacement_motion(ser, csv_file, post_action)
         else:
             print(f"Unknown mode '{mode}'. Only 'disp' is supported.")
             sys.exit(1)
