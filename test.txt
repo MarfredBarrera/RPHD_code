@@ -1,0 +1,11 @@
+# --- Move Stewart platform second ---
+platform /dev/ttyUSB0 RPHDDATAD.csv
+
+# --- Wait for platform to stabilize ---
+wait 2
+
+# --- Perform roll last ---
+start loop 3
+roll 90 40
+roll 180 300
+end loop
