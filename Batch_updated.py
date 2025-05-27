@@ -112,81 +112,81 @@ def run_batch(file_path):
         raw_lines = [line.strip() for line in file if line.strip() and not line.strip().startswith("#")]
 
 def expand_blocks(lines):
-    def parse_block(block_lines):
-        i = 0
-        expanded = []
+    i = 0
+    expanded = []
+    loop_stack = []
 
-        while i < len(block_lines):
-            line = block_lines[i]
+    def process_conditional(start_line, remaining_lines, is_unless=False):
+        condition = " ".join(start_line.split()[1:])
+        result = evaluate_condition(condition)
+        if is_unless:
+            result = not result
+        collected = []
+        while remaining_lines:
+            line = remaining_lines.pop(0)
+            if line == "end if" or line == "end unless":
+                break
+            collected.append(line)
+        return expand_blocks(collected) if result else []
 
-            if line.startswith("start loop"):
-                parts = line.split()
-                if len(parts) != 3 or not parts[2].isdigit():
-                    raise ValueError(f"Invalid loop syntax at line: {line}")
-                count = int(parts[2])
+    while i < len(lines):
+        line = lines[i]
+
+        if line.startswith("start loop"):
+            parts = line.split()
+            if len(parts) != 3 or not parts[2].isdigit():
+                raise ValueError(f"Invalid loop syntax at line: {line}")
+            loop_count = int(parts[2])
+            i += 1
+            sub_lines = []
+            while i < len(lines) and lines[i] != "end loop":
+                sub_lines.append(lines[i])
                 i += 1
-                nested = []
-                depth = 1
-                while i < len(block_lines):
-                    if block_lines[i].startswith("start loop"):
-                        depth += 1
-                    elif block_lines[i] == "end loop":
-                        depth -= 1
-                        if depth == 0:
-                            break
-                    nested.append(block_lines[i])
-                    i += 1
-                if depth != 0:
-                    raise ValueError("Missing 'end loop' for a 'start loop'")
-                expanded.extend(parse_block(nested) * count)
-                i += 1
-                continue
+            if i == len(lines):
+                raise ValueError("Missing 'end loop' for a 'start loop'")
+            i += 1  # Skip "end loop"
+            expanded_sub_block = expand_blocks(sub_lines)
+            expanded.extend(expanded_sub_block * loop_count)
 
-            elif line.startswith("if ") or line.startswith("unless "):
-                is_unless = line.startswith("unless ")
-                condition = " ".join(line.split()[1:])
-                result = evaluate_condition(condition)
-                if is_unless:
-                    result = not result
+        elif line.startswith("if "):
+            i += 1
+            conditional_lines = []
+            while i < len(lines) and lines[i] != "end if":
+                conditional_lines.append(lines[i])
                 i += 1
-                nested = []
-                depth = 1
-                while i < len(block_lines):
-                    if block_lines[i].startswith("if ") or block_lines[i].startswith("unless "):
-                        depth += 1
-                    elif block_lines[i] in ("end if", "end unless"):
-                        depth -= 1
-                        if depth == 0:
-                            break
-                    nested.append(block_lines[i])
-                    i += 1
-                if depth != 0:
-                    raise ValueError("Missing 'end if' or 'end unless'")
-                if result:
-                    expanded.extend(parse_block(nested))
+            if i == len(lines):
+                raise ValueError("Missing 'end if' for 'if' block")
+            i += 1  # Skip "end if"
+            expanded.extend(process_conditional(line, conditional_lines, is_unless=False))
+
+        elif line.startswith("unless "):
+            i += 1
+            conditional_lines = []
+            while i < len(lines) and lines[i] != "end unless":
+                conditional_lines.append(lines[i])
                 i += 1
-                continue
+            if i == len(lines):
+                raise ValueError("Missing 'end unless' for 'unless' block")
+            i += 1  # Skip "end unless"
+            expanded.extend(process_conditional(line, conditional_lines, is_unless=True))
 
-            elif line == "parallel:":
+        elif line == "parallel:":
+            i += 1
+            parallel_block = []
+            while i < len(lines) and lines[i] != "end parallel":
+                parallel_block.append(lines[i])
                 i += 1
-                nested = []
-                while i < len(block_lines) and block_lines[i] != "end parallel":
-                    nested.append(block_lines[i])
-                    i += 1
-                if i == len(block_lines):
-                    raise ValueError("Missing 'end parallel' for a 'parallel:' block")
-                expanded.append(("parallel", parse_block(nested)))
-                i += 1
-                continue
+            if i == len(lines):
+                raise ValueError("Missing 'end parallel' for a 'parallel:' block")
+            i += 1  # Skip "end parallel"
+            # Recursively expand contents before storing
+            expanded.append(("parallel", expand_blocks(parallel_block)))
 
-            else:
-                expanded.append(line)
-                i += 1
+        else:
+            expanded.append(line)
+            i += 1
 
-        return expanded
-
-    return parse_block(lines)
-
+    return expanded
 
     try:
         expanded_lines = expand_blocks(raw_lines)
