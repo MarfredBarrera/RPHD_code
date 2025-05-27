@@ -25,7 +25,7 @@ def run_script(script_path, args=None):
             process.terminate()
             process.wait()
         print("Returned to Master menu.\n")
-    
+
     thread = threading.Thread(target=_run)
     thread.start()
     return thread
@@ -37,7 +37,6 @@ def evaluate_condition(condition_line):
     keyword, target = parts[0], " ".join(parts[1:])
     if keyword == "exists":
         return os.path.exists(target)
-    # Extend here for other condition types if needed
     return False
 
 def run_parallel_block(lines):
@@ -102,32 +101,16 @@ def handle_command(command_line, return_thread=False):
         return None
     return thread
 
-def run_batch(file_path):
-    if not os.path.exists(file_path):
-        print(f"Batch file '{file_path}' not found.")
-        return
-
-    print(f"Running batch file: {file_path}")
-    with open(file_path, "r") as file:
-        raw_lines = [line.strip() for line in file if line.strip() and not line.strip().startswith("#")]
-
 def expand_blocks(lines):
     i = 0
     expanded = []
-    loop_stack = []
 
     def process_conditional(start_line, remaining_lines, is_unless=False):
         condition = " ".join(start_line.split()[1:])
         result = evaluate_condition(condition)
         if is_unless:
             result = not result
-        collected = []
-        while remaining_lines:
-            line = remaining_lines.pop(0)
-            if line == "end if" or line == "end unless":
-                break
-            collected.append(line)
-        return expand_blocks(collected) if result else []
+        return expand_blocks(remaining_lines) if result else []
 
     while i < len(lines):
         line = lines[i]
@@ -144,11 +127,11 @@ def expand_blocks(lines):
                 i += 1
             if i == len(lines):
                 raise ValueError("Missing 'end loop' for a 'start loop'")
-            i += 1  # Skip "end loop"
-            expanded_sub_block = expand_blocks(sub_lines)
-            expanded.extend(expanded_sub_block * loop_count)
+            i += 1
+            expanded.extend(expand_blocks(sub_lines) * loop_count)
 
         elif line.startswith("if "):
+            condition_line = line
             i += 1
             conditional_lines = []
             while i < len(lines) and lines[i] != "end if":
@@ -156,10 +139,11 @@ def expand_blocks(lines):
                 i += 1
             if i == len(lines):
                 raise ValueError("Missing 'end if' for 'if' block")
-            i += 1  # Skip "end if"
-            expanded.extend(process_conditional(line, conditional_lines, is_unless=False))
+            i += 1
+            expanded.extend(process_conditional(condition_line, conditional_lines, is_unless=False))
 
         elif line.startswith("unless "):
+            condition_line = line
             i += 1
             conditional_lines = []
             while i < len(lines) and lines[i] != "end unless":
@@ -167,8 +151,8 @@ def expand_blocks(lines):
                 i += 1
             if i == len(lines):
                 raise ValueError("Missing 'end unless' for 'unless' block")
-            i += 1  # Skip "end unless"
-            expanded.extend(process_conditional(line, conditional_lines, is_unless=True))
+            i += 1
+            expanded.extend(process_conditional(condition_line, conditional_lines, is_unless=True))
 
         elif line == "parallel:":
             i += 1
@@ -178,8 +162,7 @@ def expand_blocks(lines):
                 i += 1
             if i == len(lines):
                 raise ValueError("Missing 'end parallel' for a 'parallel:' block")
-            i += 1  # Skip "end parallel"
-            # Recursively expand contents before storing
+            i += 1
             expanded.append(("parallel", expand_blocks(parallel_block)))
 
         else:
@@ -188,8 +171,21 @@ def expand_blocks(lines):
 
     return expanded
 
+def run_batch(file_path):
+    if not os.path.exists(file_path):
+        print(f"Batch file '{file_path}' not found.")
+        return
+
+    print(f"Running batch file: {file_path}")
+    with open(file_path, "r") as file:
+        raw_lines = [line.strip() for line in file if line.strip() and not line.strip().startswith("#")]
+
     try:
         expanded_lines = expand_blocks(raw_lines)
+        print("Expanded batch lines:")
+        for line in expanded_lines:
+            print("  ", line)
+
         for line in expanded_lines:
             if isinstance(line, tuple) and line[0] == "parallel":
                 run_parallel_block(line[1])
@@ -242,7 +238,6 @@ def main():
                 handle_command(f"roll {angle} {speed}")
             else:
                 handle_command(user_input)
-
 
 if __name__ == "__main__":
     main()
