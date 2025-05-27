@@ -5,8 +5,8 @@ import time
 # Command to script path map
 COMMANDS = {
     "platform": os.path.join("stewart", "stewart_displacement1.py"),
-    "insert": os.path.join("rail", "code.py"),
-    "retract": os.path.join("rail", "code.py"),
+    "insert": os.path.join("rail", "insert-cw.py"),
+    "retract": os.path.join("rail", "retract-ccw.py"),
     "roll": os.path.join("dynamixel", "rolled.py")
 }
 
@@ -48,11 +48,15 @@ def handle_command(command_line):
     script_path = COMMANDS[command]
 
     if command == "platform":
-        if len(args) != 2:
-            print("Usage: platform <port> <csv_file>")
+        if len(args) != 3:
+            print("Usage: platform <port> <csv_file> <mode>")
+            print("  <mode>: 'home' to return to origin, 'exit' to stay put")
             return
-        port, csv_file = args
-        run_script(script_path, [port, "disp", csv_file])
+        port, csv_file, mode = args
+        if mode not in ("home", "exit"):
+            print("Invalid mode. Choose 'home' or 'exit'.")
+            return
+        run_script(script_path, [port, mode, csv_file])
 
     elif command in ("insert", "retract"):
         if len(args) != 1:
@@ -140,19 +144,25 @@ def main():
         else:
             parts = user_input.split()
             command = parts[0].lower()
+
             if command == "platform" and len(parts) == 1:
                 port = input("Enter the port (e.g., COMX or /dev/ttyUSBX): ").strip()
                 csv_file = input("Enter the path to the CSV file: ").strip()
-                handle_command(f"platform {port} {csv_file}")
+                mode = input("Enter mode ('home' or 'exit'): ").strip().lower()
+                handle_command(f"platform {port} {csv_file} {mode}")
+
             elif command in ("insert", "retract") and len(parts) == 1:
                 distance = input("Enter displacement: ").strip()
                 handle_command(f"{command} {distance}")
+
             elif command == "roll" and len(parts) == 1:
                 angle = input("Enter angle: ").strip()
                 speed = input("Enter speed: ").strip()
                 handle_command(f"roll {angle} {speed}")
+
             else:
                 handle_command(user_input)
 
 if __name__ == "__main__":
     main()
+
