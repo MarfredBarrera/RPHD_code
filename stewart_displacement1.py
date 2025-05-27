@@ -1,170 +1,146 @@
-import subprocess
-import os
+import serial
+import sys
 import time
+import csv
+import threading
+from datetime import datetime
 
-# Command to script path map
-COMMANDS = {
-    "platform": os.path.join("stewart", "stewart_displacement.py"),
-    "insert": os.path.join("rail", "code.py"),
-    "retract": os.path.join("rail", "code.py"),
-    "roll": os.path.join("dynamixel", "Dynamixels.py")
-}
-
-def run_script(script_path, args=None):
+def connect_serial(port):
     try:
-        cmd = ["python", script_path]
-        if args:
-            cmd += args
-        print(f"Running: {' '.join(cmd)}")
-        process = subprocess.Popen(cmd)
-        process.wait()
-    except KeyboardInterrupt:
-        print("\nEmergency stop activated. Terminating script...")
-        process.terminate()
-        process.wait()
-    print("Returned to Master menu.\n")
+        ser = serial.Serial(port, 115200, timeout=0.1)
+        print(f"Connected to serial port: {port}")
+        return ser
+    except serial.SerialException as e:
+        print(f"Error: Could not open serial port {port} — {e}")
+        sys.exit(1)
 
-def handle_command(command_line):
-    parts = command_line.strip().split()
-    if not parts:
-        return
+def send_command(ser, cmd, delay=0.0083):
+    ser.write(cmd.encode())
+    print(f"Sent: {cmd.strip()}")
+    time.sleep(delay)
+    ser.reset_input_buffer()
 
-    command = parts[0].lower()
-    args = parts[1:]
+def home_platform(ser):
+    print("Homing Stewart platform...")
+    send_command(ser, "h;", delay=0.5)
 
-    if command == "wait":
-        if len(args) != 1 or not args[0].replace('.', '', 1).isdigit():
-            print("Usage for wait: wait <seconds>")
-            return
-        wait_time = float(args[0])
-        print(f"Waiting for {wait_time} seconds...")
-        time.sleep(wait_time)
-        return
+def wait_for_stop(stop_flag):
+    input("Press Enter to stop motion and hold position...\n")
+    stop_flag.append(True)
 
-    if command not in COMMANDS:
-        print(f"Invalid command: {command}")
-        return
+def run_displacement_motion(ser, csv_file_path):
+    try:
+        with open(csv_file_path, 'r', encoding='utf-8-sig') as csvfile:
+            reader = list(csv.reader(csvfile))
+    except FileNotFoundError:
+        print(f"Error: File '{csv_file_path}' not found.")
+        sys.exit(1)
 
-    script_path = COMMANDS[command]
+    log_file = f"motion_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    stop_flag = []
 
-    if command == "platform":
-        if len(args) not in (2, 3):
-            print("Usage: platform <port> <csv_file> [home|exit]")
-            return
-        port = args[0]
-        csv_file = args[1]
-        extra_arg = args[2] if len(args) == 3 else None
+    threading.Thread(target=wait_for_stop, args=(stop_flag,), daemon=True).start()
 
-        if extra_arg:
-            run_script(script_path, [port, "disp", csv_file, extra_arg])
-        else:
-            run_script(script_path, [port, "disp", csv_file])
+    try:
+        with open(log_file, 'w', newline='', encoding='utf-8') as logfile:
+            logger = csv.writer(logfile)
+            logger.writerow([
+                "Frame", "Time (s)",
+                "X", "Y", "Z", "Roll", "Pitch", "Yaw",
+                "dX", "dY", "dZ", "dRoll", "dPitch", "dYaw"
+            ])
 
-    elif command in ("insert", "retract"):
-        if len(args) != 1:
-            print(f"Usage: {command} <displacement>")
-            return
-        direction = "in" if command == "insert" else "out"
-        displacement = args[0]
-        run_script(script_path, [direction, displacement])
+            print(f"Logging motion to: {log_file}")
+            print(f"Executing {len(reader)} displacement commands from CSV...")
 
-    elif command == "roll":
-        if len(args) != 2:
-            print("Usage: roll <angle> <speed>")
-            return
-        run_script(script_path, args)
+            start_time = time.time()
+            pose = [0.0] * 6  # Roll, Pitch, Yaw, X, Y, Z
 
-def run_batch(file_path):
-    if not os.path.exists(file_path):
-        print(f"Batch file '{file_path}' not found.")
-        return
+            for frame, row in enumerate(reader, start=1):
+                if stop_flag:
+                    print("Motion stopped by user.")
+                    break
 
-    print(f"Running batch file: {file_path}")
-    with open(file_path, "r") as file:
-        raw_lines = [line.strip() for line in file if line.strip() and not line.strip().startswith("#")]
+                if len(row) != 6:
+                    print(f"Skipping row {frame}: expected 6 values, got {len(row)}")
+                    continue
 
-    def expand_loops(lines):
-        i = 0
-        expanded = []
-        loop_stack = []
+                try:
+                    dRoll, dPitch, dYaw, dX, dY, dZ = [float(val.strip()) for val in row]
+                except ValueError as e:
+                    print(f"Skipping row {frame}: invalid float — {e}")
+                    continue
 
-        while i < len(lines):
-            line = lines[i]
-            if line.startswith("start loop"):
-                parts = line.split()
-                if len(parts) != 3 or not parts[2].isdigit():
-                    raise ValueError(f"Invalid loop syntax at line: {line}")
-                loop_count = int(parts[2])
-                loop_stack.append((loop_count, []))
-            elif line == "end loop":
-                if not loop_stack:
-                    raise ValueError("Unexpected 'end loop' with no matching 'start loop'")
-                loop_count, block = loop_stack.pop()
-                expanded_block = block * loop_count
-                if loop_stack:
-                    loop_stack[-1][1].extend(expanded_block)
-                else:
-                    expanded.extend(expanded_block)
+                pose[0] += dRoll
+                pose[1] += dPitch
+                pose[2] += dYaw
+                pose[3] += dX
+                pose[4] += dY
+                pose[5] += dZ
+
+                command = f"t {pose[3]:.2f} {pose[4]:.2f} {pose[5]:.2f} {pose[0]:.2f} {pose[1]:.2f} {pose[2]:.2f};"
+                send_command(ser, command)
+
+                timestamp = time.time() - start_time
+                logger.writerow([
+                    frame, f"{timestamp:.3f}",
+                    f"{pose[3]:.2f}", f"{pose[4]:.2f}", f"{pose[5]:.2f}",
+                    f"{pose[0]:.2f}", f"{pose[1]:.2f}", f"{pose[2]:.2f}",
+                    f"{dX:.2f}", f"{dY:.2f}", f"{dZ:.2f}",
+                    f"{dRoll:.2f}", f"{dPitch:.2f}", f"{dYaw:.2f}"
+                ])
+
+        print("Motion complete. Platform is holding last position.")
+
+        # Handle post-motion home or exit
+        if len(sys.argv) >= 4:
+            post_action = sys.argv[3].strip().lower()
+            if post_action == 'home':
+                home_platform(ser)
+            elif post_action == 'exit':
+                pass
             else:
-                if loop_stack:
-                    loop_stack[-1][1].append(line)
-                else:
-                    expanded.append(line)
-            i += 1
+                print(f"Unknown post-action '{post_action}', skipping.")
+        else:
+            while True:
+                cmd = input("Type 'home' to send platform to home position, or 'exit' to quit: ").strip().lower()
+                if cmd == 'home':
+                    home_platform(ser)
+                    break
+                elif cmd == 'exit':
+                    break
 
-        if loop_stack:
-            raise ValueError("Missing 'end loop' for a 'start loop'")
-        return expanded
-
-    try:
-        expanded_lines = expand_loops(raw_lines)
-        for line in expanded_lines:
-            print(f">> Executing: {line}")
-            handle_command(line)
-    except ValueError as e:
-        print(f"Error in batch file: {e}")
+    except Exception as e:
+        print(f"Unexpected error during motion: {e}")
+        sys.exit(1)
 
 def main():
-    print("=== Master Control Ready ===")
-    print("Available commands: 'platform', 'insert', 'retract', 'roll', or 'batch <filename>'")
-    print("Use 'wait <seconds>' to pause. Use loops with 'start loop <N>' ... 'end loop'")
-    print("Type 'exit' to quit.")
+    if len(sys.argv) < 3:
+        print("Usage: python stewart_displacement.py [PORT] disp [CSV_FILE] [home|exit]")
+        sys.exit(1)
 
-    while True:
-        user_input = input(">> ").strip()
-        if not user_input:
-            continue
+    port = sys.argv[1]
+    mode = sys.argv[2].lower()
 
-        if user_input.lower() == "exit":
-            print("Exiting Master Control.")
-            break
+    ser = connect_serial(port)
+    time.sleep(1)
+    home_platform(ser)
 
-        elif user_input.startswith("batch "):
-            _, file_path = user_input.split(maxsplit=1)
-            run_batch(file_path)
-
-        else:
-            parts = user_input.split()
-            command = parts[0].lower()
-            if command == "platform" and len(parts) == 1:
-                port = input("Enter the port (e.g., COMX or /dev/ttyUSBX): ").strip()
-                csv_file = input("Enter the path to the CSV file: ").strip()
-                home_exit = input("Enter 'home' to return home after motion or 'exit' to stop: ").strip().lower()
-                if home_exit not in ("home", "exit"):
-                    home_exit = None
-                if home_exit:
-                    handle_command(f"platform {port} {csv_file} {home_exit}")
-                else:
-                    handle_command(f"platform {port} {csv_file}")
-            elif command in ("insert", "retract") and len(parts) == 1:
-                distance = input("Enter displacement: ").strip()
-                handle_command(f"{command} {distance}")
-            elif command == "roll" and len(parts) == 1:
-                angle = input("Enter angle: ").strip()
-                speed = input("Enter speed: ").strip()
-                handle_command(f"roll {angle} {speed}")
+    try:
+        if mode == "disp":
+            if len(sys.argv) >= 4:
+                csv_file = sys.argv[3]
             else:
-                handle_command(user_input)
+                csv_file = input("Enter the CSV filename to run displacement motion: ").strip()
+
+            run_displacement_motion(ser, csv_file)
+        else:
+            print(f"Unknown mode '{mode}'. Only 'disp' is supported.")
+            sys.exit(1)
+    finally:
+        if ser:
+            ser.close()
+            print("Serial port closed.")
 
 if __name__ == "__main__":
     main()
