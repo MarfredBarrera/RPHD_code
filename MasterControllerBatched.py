@@ -2,11 +2,11 @@ import subprocess
 import os
 import time
 
-# Map commands to script paths
+# Command to script path map
 COMMANDS = {
     "platform": os.path.join("stewart", "stewart_displacement.py"),
-    "insert": os.path.join("rail", "insert.py"),
-    "retract": os.path.join("rail", "retract.py"),
+    "insert": os.path.join("rail", "code.py"),
+    "retract": os.path.join("rail", "code.py"),
     "roll": os.path.join("dynamixel", "Dynamixels.py")
 }
 
@@ -49,14 +49,14 @@ def handle_command(command_line):
 
     if command == "platform":
         if len(args) != 2:
-            print("Usage for platform: platform <port> <csv_file>")
+            print("Usage: platform <port> <csv_file>")
             return
         port, csv_file = args
         run_script(script_path, [port, "disp", csv_file])
 
     elif command in ("insert", "retract"):
         if len(args) != 1:
-            print(f"Usage for {command}: {command} <displacement>")
+            print(f"Usage: {command} <displacement>")
             return
         direction = "in" if command == "insert" else "out"
         displacement = args[0]
@@ -64,7 +64,7 @@ def handle_command(command_line):
 
     elif command == "roll":
         if len(args) != 2:
-            print("Usage for roll: roll <angle> <speed>")
+            print("Usage: roll <angle> <speed>")
             return
         run_script(script_path, args)
 
@@ -108,7 +108,6 @@ def run_batch(file_path):
 
         if loop_stack:
             raise ValueError("Missing 'end loop' for a 'start loop'")
-
         return expanded
 
     try:
@@ -122,6 +121,7 @@ def run_batch(file_path):
 def main():
     print("=== Master Control Ready ===")
     print("Available commands: 'platform', 'insert', 'retract', 'roll', or 'batch <filename>'")
+    print("Use 'wait <seconds>' to pause. Use loops with 'start loop <N>' ... 'end loop'")
     print("Type 'exit' to quit.")
 
     while True:
@@ -132,11 +132,27 @@ def main():
         if user_input.lower() == "exit":
             print("Exiting Master Control.")
             break
+
         elif user_input.startswith("batch "):
             _, file_path = user_input.split(maxsplit=1)
             run_batch(file_path)
+
         else:
-            handle_command(user_input)
+            parts = user_input.split()
+            command = parts[0].lower()
+            if command == "platform" and len(parts) == 1:
+                port = input("Enter the port (e.g., COMX or /dev/ttyUSBX): ").strip()
+                csv_file = input("Enter the path to the CSV file: ").strip()
+                handle_command(f"platform {port} {csv_file}")
+            elif command in ("insert", "retract") and len(parts) == 1:
+                distance = input("Enter displacement: ").strip()
+                handle_command(f"{command} {distance}")
+            elif command == "roll" and len(parts) == 1:
+                angle = input("Enter angle: ").strip()
+                speed = input("Enter speed: ").strip()
+                handle_command(f"roll {angle} {speed}")
+            else:
+                handle_command(user_input)
 
 if __name__ == "__main__":
     main()
