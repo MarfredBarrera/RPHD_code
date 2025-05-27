@@ -5,7 +5,6 @@ import csv
 import threading
 from datetime import datetime
 
-# Connect to the serial port
 def connect_serial(port):
     try:
         ser = serial.Serial(port, 115200, timeout=0.1)
@@ -15,24 +14,20 @@ def connect_serial(port):
         print(f"Error: Could not open serial port {port} — {e}")
         sys.exit(1)
 
-# Send a command to the Stewart platform
 def send_command(ser, cmd, delay=0.0083):
     ser.write(cmd.encode())
     print(f"Sent: {cmd.strip()}")
     time.sleep(delay)
     ser.reset_input_buffer()
 
-# Home the Stewart platform
 def home_platform(ser):
     print("Homing Stewart platform...")
     send_command(ser, "h;", delay=0.5)
 
-# Thread function to allow stopping motion by pressing Enter
 def wait_for_stop(stop_flag):
     input("Press Enter to stop motion and hold position...\n")
     stop_flag.append(True)
 
-# Run displacement-based motion using a CSV file
 def run_displacement_motion(ser, csv_file_path):
     try:
         with open(csv_file_path, 'r', encoding='utf-8-sig') as csvfile:
@@ -59,7 +54,7 @@ def run_displacement_motion(ser, csv_file_path):
             print(f"Executing {len(reader)} displacement commands from CSV...")
 
             start_time = time.time()
-            pose = [0.0] * 6  # [Roll, Pitch, Yaw, X, Y, Z]
+            pose = [0.0] * 6  # Roll, Pitch, Yaw, X, Y, Z
 
             for frame, row in enumerate(reader, start=1):
                 if stop_flag:
@@ -76,7 +71,6 @@ def run_displacement_motion(ser, csv_file_path):
                     print(f"Skipping row {frame}: invalid float — {e}")
                     continue
 
-                # Update current pose
                 pose[0] += dRoll
                 pose[1] += dPitch
                 pose[2] += dYaw
@@ -84,11 +78,9 @@ def run_displacement_motion(ser, csv_file_path):
                 pose[4] += dY
                 pose[5] += dZ
 
-                # Format and send command
                 command = f"t {pose[3]:.2f} {pose[4]:.2f} {pose[5]:.2f} {pose[0]:.2f} {pose[1]:.2f} {pose[2]:.2f};"
                 send_command(ser, command)
 
-                # Log data
                 timestamp = time.time() - start_time
                 logger.writerow([
                     frame, f"{timestamp:.3f}",
@@ -100,23 +92,31 @@ def run_displacement_motion(ser, csv_file_path):
 
         print("Motion complete. Platform is holding last position.")
 
-        # Prompt user to home manually
-        while True:
-            cmd = input("Type 'home' to send platform to home position, or 'exit' to quit: ").strip().lower()
-            if cmd == 'home':
+        # Handle post-motion home or exit
+        if len(sys.argv) >= 4:
+            post_action = sys.argv[3].strip().lower()
+            if post_action == 'home':
                 home_platform(ser)
-                break
-            elif cmd == 'exit':
-                break
+            elif post_action == 'exit':
+                pass
+            else:
+                print(f"Unknown post-action '{post_action}', skipping.")
+        else:
+            while True:
+                cmd = input("Type 'home' to send platform to home position, or 'exit' to quit: ").strip().lower()
+                if cmd == 'home':
+                    home_platform(ser)
+                    break
+                elif cmd == 'exit':
+                    break
 
     except Exception as e:
         print(f"Unexpected error during motion: {e}")
         sys.exit(1)
 
-# Main entry point
 def main():
     if len(sys.argv) < 3:
-        print("Usage: python stewart_displacement.py [PORT] [MODE] [CSV_FILE (optional)]")
+        print("Usage: python stewart_displacement.py [PORT] disp [CSV_FILE] [home|exit]")
         sys.exit(1)
 
     port = sys.argv[1]
@@ -132,6 +132,7 @@ def main():
                 csv_file = sys.argv[3]
             else:
                 csv_file = input("Enter the CSV filename to run displacement motion: ").strip()
+
             run_displacement_motion(ser, csv_file)
         else:
             print(f"Unknown mode '{mode}'. Only 'disp' is supported.")
