@@ -10,7 +10,7 @@ DIR = 10
 STEP = 8
 # Limit switch GPIO Pin
 lim1 = 37  # Pin 37 - GPIO 26
-# lim2 = 31 # Pin 31 - GPIO 6
+lim2 = 31 # Pin 31 - GPIO 6
 
 # 0/1 used to signify clockwise or counterclockwise.
 CW = 0
@@ -23,7 +23,7 @@ GPIO.setmode(GPIO.BOARD)
 GPIO.setup(DIR, GPIO.OUT)
 GPIO.setup(STEP, GPIO.OUT)
 GPIO.setup(lim1, GPIO.IN, pull_up_down = GPIO.PUD_DOWN)
-# GPIO.setup(lim2, GPIO.IN, pull_up_down = GPIO.PUD_DOWN)
+GPIO.setup(lim2, GPIO.IN, pull_up_down = GPIO.PUD_DOWN)
 
 # Set the direction you want it to spin
 GPIO.output(DIR, CW) 
@@ -43,9 +43,9 @@ try:
 		if GPIO.input(lim1) == GPIO.HIGH:
 			print("Limit switch activated. Stopping...")
 			break
-		#if GPIO.input(lim2 == GPIO.HIGH:
-			#print("Limit switch activated. Stopping...")
-			#break
+		if GPIO.input(lim2 == GPIO.HIGH:
+			print("Limit switch activated. Stopping...")
+			break
 		# Set one coil winding to high
 		GPIO.output(STEP,GPIO.HIGH)
 		# Allow it to get there.
