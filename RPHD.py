@@ -6,8 +6,8 @@ import threading
 # Command to script path map
 COMMANDS = {
     "platform": os.path.join("stewart", "stewart_displacement1.py"),
-    "insert": os.path.join("rail", "insert-cw.py"),
-    "retract": os.path.join("rail", "retract-ccw.py"),
+    "insert": os.path.join("rail", "INSERT-CW.py"),
+    "retract": os.path.join("rail", "RETRACT-CCW.py"),
     "roll": os.path.join("dynamixel", "rolled.py")
 }
 
@@ -86,9 +86,8 @@ def handle_command(command_line, return_thread=False):
         if len(args) != 1:
             print(f"Usage: {command} <displacement>")
             return None
-        direction = "in" if command == "insert" else "out"
         displacement = args[0]
-        thread = run_script(script_path, [direction, displacement])
+        thread = run_script(script_path, [displacement])
 
     elif command == "roll":
         if len(args) != 2:
@@ -198,9 +197,6 @@ def run_batch(file_path):
 def main():
     print("=== Master Control Ready ===")
     print("Available commands: 'platform', 'insert', 'retract', 'roll', or 'batch <filename>'")
-    print("Use 'wait <seconds>' to pause. Use loops with 'start loop <N>' ... 'end loop'")
-    print("Use 'parallel:' ... 'end parallel' for concurrent commands")
-    print("Use 'if exists <file>' ... 'end if' and 'unless exists <file>' ... 'end unless' for conditionals")
     print("Type 'exit' to quit.")
 
     while True:
