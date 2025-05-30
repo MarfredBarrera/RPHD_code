@@ -1,6 +1,6 @@
 import serial
 
-SERIAL_PORT = "/dev/ttyACM0"  # Adjust as needed for your system
+SERIAL_PORT = "/dev/ttyACM0"  # Adjust to match your port
 BAUDRATE = 115200
 
 def send_command(angle, speed):
@@ -15,7 +15,7 @@ def send_command(angle, speed):
 def main():
     while True:
         try:
-            user_input = input("Enter angle,speed (e.g., 180,300) or 'q' to quit: ").strip()
+            user_input = input("Enter relative angle,speed (e.g., 90,300 or -45,200), or 'q' to quit: ").strip()
             if user_input.lower() == 'q':
                 break
 
@@ -24,12 +24,12 @@ def main():
                 angle = int(angle_str)
                 speed = int(speed_str)
 
-                if 0 <= angle <= 360 and 0 <= speed <= 1023:
+                if -360 <= angle <= 360 and 0 <= speed <= 1023:
                     send_command(angle, speed)
                 else:
-                    print("Angle must be 0–360, speed must be 0–1023.")
+                    print("Angle must be between -360 and 360, speed must be 0–1023.")
             else:
-                print("Invalid format. Use angle,speed (e.g., 180,300)")
+                print("Invalid format. Use angle,speed (e.g., 180,300 or -90,250)")
         except ValueError:
             print("Invalid input. Make sure to enter two integers separated by a comma.")
 
