@@ -2,6 +2,7 @@
 import RPi.GPIO as GPIO
 from time import sleep
 import sys
+import threading
 
 # --- GPIO Pins ---
 DIR = 10
@@ -39,10 +40,25 @@ except ValueError:
 steps_per_mm = 200 / 5
 n = round(distance * steps_per_mm)
 
-print("Insertion in progress...")
+print("Insertion in progress... (Press Enter to stop manually)")
 
+# --- Emergency Stop Thread ---
+stop_flag = threading.Event()
+
+def wait_for_enter():
+    input()
+    stop_flag.set()
+
+input_thread = threading.Thread(target=wait_for_enter)
+input_thread.daemon = True
+input_thread.start()
+
+# --- Main Stepper Loop ---
 try:
     for x in range(n):
+        if stop_flag.is_set():
+            print("Emergency stop triggered. Linear rail stopped.")
+            break
         if GPIO.input(lim1) == GPIO.HIGH or GPIO.input(lim2) == GPIO.HIGH:
             print("Limit switch activated. Stopping...")
             break
