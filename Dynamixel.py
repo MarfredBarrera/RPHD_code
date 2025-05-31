@@ -1,28 +1,52 @@
 import serial
+import sys
 
-SERIAL_PORT = "/dev/ttyACM0"  # Adjust if different
+SERIAL_PORT = "/dev/ttyACM0"  # Adjust for your system
 BAUDRATE = 115200
 
-def send_angle(angle):
+def send_command(angle, speed):
     with serial.Serial(SERIAL_PORT, BAUDRATE, timeout=2) as ser:
         ser.flush()
-        ser.write(f"{angle}\n".encode())
+        command = f"{angle},{speed}\n"
+        ser.write(command.encode())
+
         response = ser.readline().decode().strip()
         print("Response from OpenRB:", response)
 
 def main():
+    if len(sys.argv) == 3:
+        try:
+            angle = int(sys.argv[1])
+            speed = int(sys.argv[2])
+
+            if 0 <= angle <= 360 and 0 <= speed <= 1023:
+                send_command(angle, speed)
+            else:
+                print("Angle must be 0–360, speed must be 0–1023.")
+        except ValueError:
+            print("Invalid arguments. Provide two integers: angle speed")
+        return
+
+    # Manual input mode
     while True:
         try:
-            angle = input("Enter angle (0-360, or 'q' to quit): ")
-            if angle.lower() == 'q':
+            user_input = input("Enter angle,speed (e.g., 180,300) or 'q' to quit: ").strip()
+            if user_input.lower() == 'q':
                 break
-            angle_val = int(angle)
-            if 0 <= angle_val <= 360:
-                send_angle(angle_val)
+
+            if ',' in user_input:
+                angle_str, speed_str = user_input.split(',', 1)
+                angle = int(angle_str)
+                speed = int(speed_str)
+
+                if 0 <= angle <= 360 and 0 <= speed <= 1023:
+                    send_command(angle, speed)
+                else:
+                    print("Angle must be 0–360, speed must be 0–1023.")
             else:
-                print("Please enter a value between 0 and 360.")
+                print("Invalid format. Use angle,speed (e.g., 180,300)")
         except ValueError:
-            print("Invalid input.")
+            print("Invalid input. Make sure to enter two integers separated by a comma.")
 
 if __name__ == "__main__":
     main()
