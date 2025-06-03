@@ -451,18 +451,28 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    ATI_port = 'COM1'# Change to your port
+    LED_port = 'COM13'  # Change to your Arduino port
+
     # Check if a device exists on COM1
-    if not check_device_on_port('/dev/ttyUSB0'):
-        print("No device detected on COM1. Exiting...")
+    if not check_device_on_port(ATI_port) or not check_device_on_port(LED_port):
+        print("Missing device. Please check connections and port settings...")
         exit(1)    
 
+    arduino = serial.Serial(LED_port, 9600, timeout=1)
+    time.sleep(2)  # Give Arduino time to reset after opening port
+
     
-    daq = Sensor('/dev/ttyUSB0', mode=args.mode)  # for linux probably /dev/ttyUSB0, use dmesg | grep tty to find the port
+    daq = Sensor(ATI_port, mode=args.mode)  # for linux probably /dev/ttyUSB0, use dmesg | grep tty to find the port
+
+
     start_time = time.perf_counter()
     # initialize array to store data
     data = []
 
     try:
+
+        arduino.write(b'H')
         while True:
             try:
                 _msg = daq.read()
@@ -483,22 +493,6 @@ if __name__ == '__main__':
                     daq.sensor_bias(forces)
                     # print(f'Biased: {daq._bias}')
 
-                # # Check for 'b' key press to bias sensor
-                # if keyboard.is_pressed('b'):
-                #     if daq._mode =='binary':
-                #         forces = decode_force_torque(_msg)
-                #     else: 
-                #         forces = daq.counts_2_force_torque(_msg, unbiased=True)
-                #     daq.sensor_bias(forces)
-                #     # print(f'Biased: {daq._bias}')
-                #     time.sleep(0.1)
-
-                # Quit program on 'q' key press
-                # if keyboard.is_pressed('q'):
-                #     daq.stop()
-                #     daq.connection.close()
-                #     print('Connection closed...')
-                #     exit(0)
 
             except Exception as e:
                 print(e)
@@ -506,6 +500,9 @@ if __name__ == '__main__':
         daq.stop()
         daq.connection.close()
         print('Connection closed...')
+
+        arduino.write(b'L')
+        arduino.close()
         # print(data)
         record_data(daq, data, filename="ATI_data.csv")
         exit(0)
