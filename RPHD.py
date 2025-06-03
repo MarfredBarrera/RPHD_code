@@ -8,7 +8,7 @@ COMMANDS = {
     "platform": os.path.join("stewart", "stewart_displacement1.py"),
     "insert": os.path.join("rail", "INSERT-CW.py"),
     "retract": os.path.join("rail", "RETRACT-CCW.py"),
-    "roll": os.path.join("dynamixel", "rolled.py")
+    "roll": os.path.join("dynamixel", "Dynamixel.py")
 }
 
 def run_script(script_path, args=None):
@@ -222,7 +222,7 @@ def main():
             command = parts[0].lower()
             if command == "platform" and len(parts) == 1:
                 port = input("Enter the port (e.g., COMX or /dev/ttyUSBX): ").strip()
-                csv_file = input("Enter the path to the CSV file: ").strip()
+                csv_file = input("Enter the CSV file: ").strip()
                 post_action = input("Post-action after motion [home/exit]: ").strip().lower() or "exit"
                 handle_command(f"platform {port} {csv_file} {post_action}")
             elif command in ("insert", "retract") and len(parts) == 1:
