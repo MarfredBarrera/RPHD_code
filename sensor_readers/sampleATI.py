@@ -452,7 +452,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     ATI_port = 'COM1'# Change to your port
-    LED_port = 'COM13'  # Change to your Arduino port
+    LED_port = 'COM14'  # Change to your Arduino port
 
     # Check if a device exists on COM1
     if not check_device_on_port(ATI_port) or not check_device_on_port(LED_port):
